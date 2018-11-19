@@ -1,0 +1,161 @@
+# 如下为jenkins pipeline执行并发任务的pipeline 脚本demo；
+# 仅供参考，具体使用可联系：hongbin.che@itel-mobile.com
+pipeline {
+    agent { label 'XXOO' }
+    environment {
+        Envdir = "XXOO"
+    }
+    stages {
+        stage('XXOO'){
+            steps {
+                script {
+                    res = sh(script: "test -d ${Envdir}/.script && echo '1' || echo '0' ", returnStdout: true).trim()
+                    if(res=='0'){
+                        sh "XXOO"
+                    } else {
+                        sh "XXOO"
+                    }
+                }
+            }
+        }
+        stage('XXOO') {
+            steps {
+                script {
+                    if (env.BUILD_TYPE == 'user'){
+                        SUFF_VTYPE='user'
+                    }else
+                    if (env.BUILD_TYPE == 'userdebug'){
+                        SUFF_VTYPE='userdebug'
+                    }
+                    timestamps {sh "XXOO"}
+                }
+            }
+        }
+        stage('XXOO') {
+            failFast true
+            parallel {
+                stage('XXOO')
+                {
+                    steps {
+                        script {
+                            try {
+                                timestamps {sh "XXOO"}
+                                timestamps {sh "XXOO"}
+                                timestamps {sh "XXOO"}
+                            }catch ( error ) {
+                                currentBuild.result = 'FAILURE'
+                                Thread.getAllStackTraces().keySet().each() {
+                                    if (it.name.contains(${JOB_NAME})) {
+                                        println "Stopping $it.name"
+                                        it.stop()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('XXOO')
+                {
+                    steps
+                    {
+                        script
+                        {
+                        try {
+                            timestamps {sh "XXOO"}
+                            amssmodem = [ '1', '2', '3','4','5','6','7']
+                            def amssbuildSteps = [failFast: true]
+                            for (suite in amssmodem)
+                            {
+                                def suites=suite
+                                amssbuildSteps[suites] =
+                                {
+                                   timestamps {sh "XXOO"}
+                                }
+                            }
+                            parallel amssbuildSteps
+                            timestamps {sh "XXOO"}
+                            timestamps {sh "XXOO"}
+                        }catch ( error ) {
+                                currentBuild.result = 'FAILURE'
+                                Thread.getAllStackTraces().keySet().each() {
+                                    if (it.name.contains(${JOB_NAME})) {
+                                        println "Stopping $it.name"
+                                        it.stop()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('XXOO') {
+            steps
+            {
+                script
+                {
+                    timestamps {sh "XXOO"}
+                }
+            }
+        }
+        stage('XXOO') {
+            steps
+            {
+                script
+                {
+                    timestamps {sh "XXOO"}
+                }
+            }
+        }
+        stage('XXOO') {
+            when {
+                // stage won't be skipped as long as XXOO == true
+                environment name: "XXOO", value: "true"
+            }
+            steps
+            {
+                script
+                {
+                    timestamps {sh "XXOO"}
+                }
+            }
+        }
+        stage('XXOO') {
+            when {
+                // stage won't be skipped as long as XXOO == true
+                environment name: "XXOO", value: "true"
+            }
+            steps
+            {
+                script
+                {
+                    timestamps {sh "XXOO"}
+                }
+            }
+        }
+        stage('CleanEnv') {
+            steps
+            {
+                script
+                {
+                    timestamps {sh "XXOO"}
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo 'I succeeded!'
+        }
+        failure {
+            script
+            {
+                timestamps {sh "XXOO"}
+            }
+        }
+        aborted {
+            echo 'I aborted :('
+        }
+    }
+
+}
