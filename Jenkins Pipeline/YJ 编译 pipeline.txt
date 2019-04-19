@@ -1,0 +1,21 @@
+node('Ubu_10.250.115.100') {
+    stage ('1.代码处理'){
+        
+        echo "BUILD_MODE :"+env.BUILD_MODE
+        echo "workspace:"+env.WORKSPACE
+        echo "Job Name:"+env.JOB_NAME
+        echo "PRODUCT_PCBA:"+env.PRODUCT_PCBA
+        git credentialsId: '18d792e7-d75d-4133-9fc1-c8f754a801e1', url: 'ssh://10.250.115.12:29418/APK/script'
+        sh 'bash $WORKSPACE/othertools/AOSP_Build/YJ/1.Get_Code.sh  $JOB_NAME $BUILD_MODE "sp7731e" '
+    }
+    stage ('2.编译前处理'){
+        sh 'bash $WORKSPACE/othertools/AOSP_Build/YJ/2.Build_Ready.sh   $JOB_NAME $BUILD_MODE "sp7731e" $PRODUCT_PCBA $BUILD_TYPE'
+        
+    }
+    stage ('3.编译代码'){
+        sh 'bash $WORKSPACE/othertools/AOSP_Build/YJ/3.Build_Code.sh   $JOB_NAME $BUILD_MODE $PRODUCT_PCBA $BUILD_TYPE "sp7731e" '
+    }
+    stage ('4.拷贝文件'){
+        sh 'bash $WORKSPACE/othertools/AOSP_Build/YJ/4.Copy_Image.sh $JOB_NAME  $PRODUCT_PCBA $BUILD_TYPE "sp7731e" '
+    }
+}
