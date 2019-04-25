@@ -1,0 +1,358 @@
+#!/usr/bin/env groovy
+import hudson.model.*;
+import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.workflow.*;
+import hudson.slaves.DumbSlave;
+List<String> deflists = new ArrayList<>();
+deflists=getChoiceParameter('STS_VERSION_BUILD');
+pipeline {
+    agent { label 'oneplus_build' }
+    environment {
+        Envdir = "/work/home/jenkins/"
+    }
+    parameters {
+        choice(choices: ['false', 'true'], description: 'STS version Build', name: 'STS_VERSION_BUILD')
+    }
+    stages {
+        stage('Check:\n ScriptExists'){
+            steps {
+                script {
+                    set_executors_balance();
+                    upChoiceParameter('STS_VERSION_BUILD',deflists);
+                    if (env.AMSS_PARALLEL_MODEL == null || env.AMSS_SINGLEMODEM == null || env.AMSS_PARALLEL_MODEL == '' || env.AMSS_SINGLEMODEM == '') {
+                        echo 'AMSS_PARALLEL_MODEL & AMSS_SINGLEMODEM parameter not exists'
+                        currentBuild.result = 'FAILURE';
+                        sh "exit 1";
+                    }
+                    res = sh(script: "test -d ${env.Envdir}/${JOB_NAME}/.script && echo '1' || echo '0' ", returnStdout: true).trim()
+                    if(res=='0'){
+                        sh "mkdir -p ${env.Envdir}/${JOB_NAME}/;cd ${env.Envdir}/${JOB_NAME}/;git clone ssh://xxx:29418/Other/tools/script .script -b Oneplus_Platform_Build_Pipeline_Pool"
+                    } else {
+                        sh "cd ${env.Envdir}/${JOB_NAME}/.script;git reset --hard;git clean -fdx;git reset;git remote update;git checkout remotes/origin/Oneplus_Platform_Build_Pipeline_Pool;git pull origin Oneplus_Platform_Build_Pipeline_Pool"
+                    }
+                }
+            }
+        }
+        stage('Set:\n   BuildEnv') {
+            steps {
+                script {
+                    wrap([$class: 'BuildUser']) {
+                        if (env.BUILD_TYPE == 'user'){
+                            SUFF_VTYPE='user'
+                        }else
+                        if (env.BUILD_TYPE == 'userdebug'){
+                            SUFF_VTYPE='userdebug'
+                        }
+                        if (env.ONEPLUS_BUGREPORT_FEATURE != null && env.ONEPLUS_BUGREPORT_FEATURE != '' && env.JENKINS_BUILD_NUMBER != null && env.JENKINS_BUILD_NUMBER != ''){
+                            timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.0_OnePlus_SetEnv.sh -c ${PROJECT_NAME} -b ${PARAMETER_FILE_NAME} -f ${SUFF_VTYPE} -e ${ENFORCE} -o ${VERSION_TYPE} -p ${PACK_ENV} -r ${REGION} -a ${PACK_OTA} -m ${FAKE_OTA} -q ${BASE_TYPE} -n ${ONEPLUS_BUGREPORT_FEATURE} -g ${JENKINS_BUILD_NUMBER} CCACHE_ENABLE=${CCACHE_ENABLE} QE_AGING_BUILD=${QE_AGING_BUILD} AGING_BUILD_PARAM=${AGING_BUILD_PARAM} CUSTOM_PARAMETER='${CUSTOM_PARAMETER}' CUSTOM_GITURL_CMD='${CUSTOM_GITURL_CMD}'"}
+                        } else if((env.ONEPLUS_BUGREPORT_FEATURE == null || env.ONEPLUS_BUGREPORT_FEATURE == '') && (env.JENKINS_BUILD_NUMBER != null && env.JENKINS_BUILD_NUMBER != '')) {
+                            timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.0_OnePlus_SetEnv.sh -c ${PROJECT_NAME} -b ${PARAMETER_FILE_NAME} -f ${SUFF_VTYPE} -e ${ENFORCE} -o ${VERSION_TYPE} -p ${PACK_ENV} -r ${REGION} -a ${PACK_OTA} -m ${FAKE_OTA} -q ${BASE_TYPE} -g ${JENKINS_BUILD_NUMBER} CCACHE_ENABLE=${CCACHE_ENABLE} QE_AGING_BUILD=${QE_AGING_BUILD} AGING_BUILD_PARAM=${AGING_BUILD_PARAM} CUSTOM_PARAMETER='${CUSTOM_PARAMETER}' CUSTOM_GITURL_CMD='${CUSTOM_GITURL_CMD}'"}
+                        } else if ((env.JENKINS_BUILD_NUMBER == null || env.JENKINS_BUILD_NUMBER == '') && (env.ONEPLUS_BUGREPORT_FEATURE != null && env.ONEPLUS_BUGREPORT_FEATURE != '')){
+                            timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.0_OnePlus_SetEnv.sh -c ${PROJECT_NAME} -b ${PARAMETER_FILE_NAME} -f ${SUFF_VTYPE} -e ${ENFORCE} -o ${VERSION_TYPE} -p ${PACK_ENV} -r ${REGION} -a ${PACK_OTA} -m ${FAKE_OTA} -q ${BASE_TYPE} -n ${ONEPLUS_BUGREPORT_FEATURE} CCACHE_ENABLE=${CCACHE_ENABLE} QE_AGING_BUILD=${QE_AGING_BUILD} AGING_BUILD_PARAM=${AGING_BUILD_PARAM} CUSTOM_PARAMETER='${CUSTOM_PARAMETER}' CUSTOM_GITURL_CMD='${CUSTOM_GITURL_CMD}'"}
+                        } else if ((env.JENKINS_BUILD_NUMBER == null || env.JENKINS_BUILD_NUMBER == '') && (env.ONEPLUS_BUGREPORT_FEATURE == null || env.ONEPLUS_BUGREPORT_FEATURE == '')){
+                            timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.0_OnePlus_SetEnv.sh -c ${PROJECT_NAME} -b ${PARAMETER_FILE_NAME} -f ${SUFF_VTYPE} -e ${ENFORCE} -o ${VERSION_TYPE} -p ${PACK_ENV} -r ${REGION} -a ${PACK_OTA} -m ${FAKE_OTA} -q ${BASE_TYPE} CCACHE_ENABLE=${CCACHE_ENABLE} QE_AGING_BUILD=${QE_AGING_BUILD} AGING_BUILD_PARAM=${AGING_BUILD_PARAM} CUSTOM_PARAMETER='${CUSTOM_PARAMETER}' CUSTOM_GITURL_CMD='${CUSTOM_GITURL_CMD}'"}
+                        }
+                    }
+                }
+            }
+        }
+        stage('Build') {
+            failFast true
+            parallel {
+                stage('Build:\n   AP')
+                {
+                    steps {
+                        script {
+                                timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.1_OnePlus_AP_Build.sh GET_CODE=true"}
+                                if (env.AUTO_TRIGGER_BUILD == 'true') {
+                                    timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/Trigger_slave_build.sh AUTO_TRIGGER_BUILD='${AUTO_TRIGGER_BUILD}'"}
+                                }
+                                timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.1_OnePlus_AP_Build.sh BUILD_CODE=true"}
+                                timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/2.0_AP_Image_Upload.sh UPLOAD_IMG=true"}
+                        }
+                    }
+                }
+                stage('Build:\n   AMSS')
+                {
+                    steps
+                    {
+                        script
+                        {
+                            timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.1_OnePlus_AMSS_Build.sh GET_CODE=true"}
+                            amss_parallelmodem = AMSS_PARALLEL_MODEL.split(':')
+                            def amssbuildSteps = [failFast: true]
+                            for (suite in amss_parallelmodem)
+                            {
+                                def suites=suite
+                                amssbuildSteps[suites] =
+                                {
+                                   timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.1_OnePlus_AMSS_Build.sh BUILD_CODE=true BUILD_NUM=${suites}"}
+                                }
+                            }
+                            parallel amssbuildSteps
+                            amss_singlemodem=AMSS_SINGLEMODEM.split(':')
+                            for (single in amss_singlemodem)
+                            {
+                                timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/1.1_OnePlus_AMSS_Build.sh BUILD_CODE=true BUILD_NUM=${single}"}
+                            }
+                            timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/2.0_AMSS_Image_Upload.sh UPLOAD_IMG=true"}
+                        }
+                    }
+                }
+            }
+        }
+        stage('Release:\n   Img') {
+            steps
+            {
+                script
+                {
+                    timestamps {
+                    set_executors_balance();
+                    sh "cd ${env.Envdir};./${JOB_NAME}/.script/3.1_OnePlus_Release.sh"}
+                }
+            }
+        }
+        stage('CopyDebug') {
+            steps
+            {
+                script
+                {
+                    timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/3.2_OnePlus_CopyDebug.sh"}
+                    def TRIGGER_TW_JOB_fullpath = env.TRIGGER_TW_JOB_fullpath == null ? 'false' : env.TRIGGER_TW_JOB_fullpath
+                    if (TRIGGER_TW_JOB_fullpath == 'true') {
+                        timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/Trigger_TW_JOB_fullpath.sh"}
+                    }
+                }
+            }
+        }
+        stage('Gen:\n  Ota_Img') {
+            when {
+                environment name: "PACK_OTA", value: "true"
+            }
+            steps
+            {
+                script
+                {
+                    timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/4_OnePlus_Gen_OTA.sh"}
+                }
+            }
+        }
+        stage('Build:\n  Qe_Aging') {
+            when {
+                environment name: "QE_AGING_BUILD", value: "true"
+            }
+            steps
+            {
+                script
+                {
+                    timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/4.1_OnePlus_Qe_aging.sh"}
+                }
+            }
+        }
+        stage('Build:\n  STS_BUILD') {
+            when {
+                expression { params.STS_VERSION_BUILD == 'true' }
+            }
+            steps
+            {
+                script
+                {
+                    timestamps {
+                    set_executors_balance();
+                    sh "cd ${env.Envdir};./${JOB_NAME}/.script/5_OnePlus_Sts_Build.sh"}
+                }
+            }
+        }
+        stage('CleanEnv') {
+            steps
+            {
+                script
+                {
+                    timestamps {sh "cd ${env.Envdir};./${JOB_NAME}/.script/5_OnePlus_CleanEnv.sh"}
+                }
+            }
+        }
+    }
+    post {
+        success {
+            script
+            {
+                timestamps {set_executors_balance();}
+                echo 'I succeeded!'
+            }
+        }
+        failure {
+            script
+            {   wrap([$class: 'BuildUser']) {
+                    timestamps {
+                    upChoiceParameter('STS_VERSION_BUILD',deflists);
+                    sh "cd ${env.Envdir};./${JOB_NAME}/.script/6_OnePlus_Excepion.sh";
+                    set_executors_balance();}
+                }
+            }
+        }
+        aborted {
+            script
+            {
+                timestamps {
+                upChoiceParameter('STS_VERSION_BUILD',deflists);
+                sh "cd ${env.Envdir};./${JOB_NAME}/.script/6_OnePlus_Abort.sh";
+                set_executors_balance();}
+                echo 'I aborted :('
+            }
+        }
+    }
+}
+
+def upChoiceParameter(String paramname,List deflist){
+    if (Hudson.instance.getJob(env['JOB_NAME']).getProperty(hudson.model.ParametersDefinitionProperty).getParameterDefinitions() !=null){
+        for(param in Hudson.instance.getJob(env['JOB_NAME']).getProperty(hudson.model.ParametersDefinitionProperty).getParameterDefinitions()) {
+            if (param instanceof ChoiceParameterDefinition){
+                try {
+                    if(param.name ==paramname){
+                        if((deflist.size()!=0)){
+                            //println("Preparam.name:"+param.name + " " + param.choices)
+                            param.setChoices(deflist)
+                            //println("param.name:"+param.name + " " + param.choices)
+                            Hudson.instance.getJob(env['JOB_NAME']).save()
+                        }
+                    }
+                }
+                catch(Exception e) {
+                    println("Exception:"+e)
+                }
+            }
+        }
+    }
+}
+
+def getChoiceParameter(String paramname){
+    List<String> list = new ArrayList<>();
+    if (Hudson.instance.getJob(env['JOB_NAME']).getProperty(hudson.model.ParametersDefinitionProperty).getParameterDefinitions() !=null){
+        for(param in Hudson.instance.getJob(env['JOB_NAME']).getProperty(hudson.model.ParametersDefinitionProperty).getParameterDefinitions()) {
+            if (param instanceof ChoiceParameterDefinition){
+                try {
+                    if(param.name ==paramname){
+                        for ( l in param.choices){
+                            list.add(l)
+                        }
+                    }
+                }
+                catch(Exception e) {
+                    println("Exception:"+e)
+                }
+            }
+        }
+    }
+    return list
+}
+
+void set_executors_balance(){
+    def computer=hudson.model.Hudson.getInstance().getComputer(env['NODE_NAME'])//.getChannel()
+    //total = hudson.model.Hudson.getInstance().getSlave(env['NODE_NAME']).getRootPath().getTotalDiskSpace()/(1024 * 1024 * 1024) as int;
+    freespace= hudson.model.Hudson.getInstance().getSlave(env['NODE_NAME']).getRootPath().getUsableDiskSpace()/(1024 * 1024 * 1024) as int;
+    //available = (100 * free)/total;
+    println(env['NODE_NAME'] + " free space: " + freespace + "GB");
+    def Execut_listThread= computer.getExecutors()
+    def set_ec=hudson.model.Hudson.getInstance().getSlave(env['NODE_NAME']).getNumExecutors();
+    def pre_ec=set_ec;
+    def excu=Execut_listThread.size();
+    print "Execut_listThread's size:"+excu
+    print "pre_ec:"+pre_ec
+    def exit_stage=0
+    def free_stage=0
+    def build_stage=0
+    def pipeline_job=0
+    for (Exthread in Execut_listThread){
+        if(Exthread.getCurrentExecutable().toString() =~ 'PlaceholderExecutable:ExecutorStepExecution'){
+            pipeline_job++
+            if (Exthread.getCurrentWorkUnit().toString().split('\\(').length >=2){
+                if( Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'ScriptExists'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'BuildEnv'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'AP'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'AMSS'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'STS_BUILD'){
+                    build_stage++
+                }else if(Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'Release'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'CopyDebug'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'Ota_Img'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'Qe_Aging'
+                || Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'CleanEnv'){
+                    free_stage++;
+                }else if(Exthread.getCurrentWorkUnit().toString().split('\\(')[1] =~ 'Actions'){
+                    exit_stage++
+                }
+            }
+        }
+    }
+    if(freespace >500){
+        if(build_stage ==0){
+            if (exit_stage >0){
+                set_ec=excu
+            }else if (free_stage >0){
+                set_ec=excu+1
+            }
+        }
+    }
+    print "pipeline_job:"+pipeline_job
+    print "free_stage:"+free_stage
+    print "build_stage:"+build_stage
+    print "exit_stage:"+exit_stage
+    if ((pipeline_job==1) && (free_stage==0) && (build_stage==0) && (exit_stage>0)){set_ec=1}
+    if ((pipeline_job >1) && (exit_stage>0)){set_ec=pipeline_job-exit_stage+1}
+    if((build_stage >0) || (freespace < 390)){set_ec=1}
+    print "set_ec:"+set_ec
+    if(set_ec != pre_ec){
+        hudson.model.Hudson.getInstance().getSlave(env['NODE_NAME']).setNumExecutors(set_ec);
+        hudson.model.Hudson.getInstance().getSlave(env['NODE_NAME']).setNodeDescription('update by '+env['JOB_NAME']);
+        hudson.model.Hudson.getInstance().getSlave(env['NODE_NAME']).save();
+        print "set set_ec:"+set_ec
+        mec=hudson.model.Hudson.getInstance().getNumExecutors();
+        if (mec >= 1){
+            mec=0;
+        }else{
+            mec=1;
+        }
+        hudson.model.Hudson.getInstance().setNumExecutors(mec);
+        hudson.model.Hudson.getInstance().save();
+    }
+}
+
+//@NonCPS
+//def KillJenkinsStuckBuild(){
+  //print "Cancelling outdated running builds"
+//  try {
+//    stopCurrentBuilds();
+//    def jobName = env.JOB_NAME
+//    def buildNumber = env.BUILD_NUMBER.toInteger()
+//    /* Get job name */
+//    def currentJob = Jenkins.instance.getItemByFullName(jobName)
+
+//    /* Iterating over the builds for specific job */
+//    for (def build : currentJob.builds) {
+//      /* If there is a build that is currently running and it's not current build */
+//      if (build.isBuilding() /*&& build.number.toInteger() == buildNumber*/) {
+//        /* Than stopping it */
+//        build.doKill();
+//        build.doStop();
+//      }
+//    }
+//  } catch (Exception exc) {
+//    println "Couldn't stop outdated builds, continuing anyway"
+//    print exc
+//  }
+//}
+
+//def stopCurrentBuilds(){
+//    try {
+//        Thread.getAllStackTraces().keySet().each() {
+//            if (it.name.contains(env.JOB_NAME)) {
+//                println "Stopping $it.name"
+//                it.stop()
+//            }
+//        }
+//    } catch (Exception exc) {
+//        println "stopCurrentBuilds ERROR"
+//        print exc
+//    }
+//}
